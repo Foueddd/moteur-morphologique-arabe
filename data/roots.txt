@@ -1,0 +1,49 @@
+# Fichier de racines arabes trilatérales
+# Format: une racine par ligne
+# Ces racines sont utilisées pour la génération et validation morphologique
+
+# Racines liées à l'écriture et la lecture
+كتب
+درس
+قرأ
+
+# Racines liées aux actions et mouvements
+ذهب
+جاء
+مشى
+وقف
+جلس
+
+# Racines liées aux sens et perceptions
+رأى
+سمع
+شم
+ذاق
+لمس
+
+# Racines liées aux émotions
+حب
+بغض
+خاف
+فرح
+حزن
+
+# Racines liées à l'alimentation et la boisson
+أكل
+شرب
+طبخ
+ذبح
+
+# Racines liées au travail et à la créativité
+صنع
+بنى
+رسم
+نجر
+طرز
+
+# Racines liées à la nature et l'environnement
+نبت
+نما
+سقى
+حرث
+حصد
