@@ -95,7 +95,7 @@ namespace Utils {
     inline void printHeader() {
         printSeparator(70, '=');
         std::cout << "   MOTEUR DE RECHERCHE MORPHOLOGIQUE ARABE" << std::endl;
-        std::cout << "   Arbre AVL + Table de Hachage + Listes Chaînées" << std::endl;
+        std::cout << "   ABR + Table de Hachage + Listes Chaînées" << std::endl;
         printSeparator(70, '=');
     }
     
@@ -145,7 +145,7 @@ namespace Utils {
         std::cout << "STATISTIQUES DU SYSTÈME" << std::endl;
         printSeparator(70, '-');
         
-        std::cout << "Nombre de racines (Arbre AVL): " << rootCount << std::endl;
+        std::cout << "Nombre de racines (Arbre ABR): " << rootCount << std::endl;
         std::cout << "Nombre de schèmes (Table Hash): " << patternCount << std::endl;
         std::cout << "Facteur de charge (Hash): " << (loadFactor * 100) << "%" << std::endl;
         

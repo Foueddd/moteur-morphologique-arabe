@@ -25,17 +25,17 @@ struct DerivedWord {
 };
 
 // ============================================================================
-// 2. STRUCTURE POUR UN NŒUD DE L'ARBRE AVL
+// 2. STRUCTURE POUR UN NŒUD DE L'ARBRE BINAIRE DE RECHERCHE (ABR)
 // ============================================================================
-struct AVLNode {
+struct BSTNode {
     std::string root;           // Racine arabe (ex: كتب)
-    int height;                 // Hauteur du nœud pour équilibre AVL
+    int height;                 // Hauteur du nœud (pour information)
     DerivedWord* derivedList;   // Liste chaînée des mots dérivés
-    AVLNode* left;              // Pointeur fils gauche
-    AVLNode* right;             // Pointeur fils droit
+    BSTNode* left;              // Pointeur fils gauche
+    BSTNode* right;             // Pointeur fils droit
     
     // Constructeur
-    AVLNode(const std::string& r)
+    BSTNode(const std::string& r)
         : root(r), height(1), derivedList(nullptr), left(nullptr), right(nullptr) {}
 };
 

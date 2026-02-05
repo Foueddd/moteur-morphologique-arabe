@@ -2,7 +2,7 @@
 #define MORPHOLOGY_ENGINE_H
 
 #include "structs.h"
-#include "avl_tree.h"
+#include "bst_tree.h"
 #include "hash_table.h"
 #include "utils.h"
 #include <iostream>
@@ -23,10 +23,10 @@
 
 class MorphologyEngine {
 private:
-    AVLTree rootTree;                  // Arbre AVL des racines
+    BSTree rootTree;                  // Arbre ABR des racines
     PatternHashTable patternTable;     // Table de hachage des schèmes
 
-    void collectNodesInOrder(AVLNode* node, std::vector<AVLNode*>& out) const {
+    void collectNodesInOrder(BSTNode* node, std::vector<BSTNode*>& out) const {
         if (node == nullptr) return;
         collectNodesInOrder(node->left, out);
         out.push_back(node);
@@ -195,7 +195,7 @@ public:
     // ========================================================================
     
     /**
-     * Ajoute une racine à l'arbre AVL
+     * Ajoute une racine à l'arbre ABR
      * Complexité : O(log n)
      */
     void addRoot(const std::string& root) {
@@ -208,7 +208,7 @@ public:
     }
 
     /**
-     * Supprime une racine de l'arbre AVL
+     * Supprime une racine de l'arbre ABR
      * Complexité : O(log n)
      */
     bool removeRoot(const std::string& root) {
@@ -223,7 +223,7 @@ public:
      * Cherche une racine
      * Complexité : O(log n)
      */
-    AVLNode* findRoot(const std::string& root) {
+    BSTNode* findRoot(const std::string& root) {
         return rootTree.search(root);
     }
     
@@ -334,6 +334,9 @@ public:
             return "";
         }
         
+        // Ajouter automatiquement le mot dérivé à la liste de la racine
+        addDerivedWordToRoot(root, derived, patternName);
+        
         return derived;
     }
     
@@ -342,7 +345,7 @@ public:
      * Complexité : O(log n)
      */
     bool addDerivedWordToRoot(const std::string& root, const std::string& word, const std::string& pattern) {
-        AVLNode* node = rootTree.search(root);
+        BSTNode* node = rootTree.search(root);
         
         if (node == nullptr) {
             std::cout << "Erreur: Racine '" << root << "' non trouvée." << std::endl;
@@ -372,7 +375,7 @@ public:
      * Complexité : O(log n + m) où m = nombre de dérivés
      */
     void displayDerivedWordsOfRoot(const std::string& root) {
-        AVLNode* node = rootTree.search(root);
+        BSTNode* node = rootTree.search(root);
         
         if (node == nullptr) {
             std::cout << "Racine '" << root << "' non trouvée." << std::endl;
@@ -402,24 +405,38 @@ public:
      * Complexité : O(log n + m)
      */
     std::string getDerivedWordsText(const std::string& root) {
-        AVLNode* node = rootTree.search(root);
+        BSTNode* node = rootTree.search(root);
         if (node == nullptr) {
             return "Racine non trouvée.";
         }
 
-        if (node->derivedList == nullptr) {
-            return "Aucun mot dérivé.";
-        }
-
-        std::string result;
+        // Générer les mots dérivés automatiquement avec tous les schèmes
+        std::string result = "\n📚 MOTS DÉRIVÉS GÉNÉRÉS :\n";
+        result += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
+        
+        int patternCount = 0;
+        Pattern* patterns = patternTable.getAllPatterns(patternCount);
+        
         int count = 0;
-        DerivedWord* current = node->derivedList;
-        while (current != nullptr) {
-            count++;
-            result += std::to_string(count) + ". ";
-            result += current->word + " | Schème: " + current->pattern + " | Fréquence: " + std::to_string(current->frequency) + "\n";
-            current = current->next;
+        for (int i = 0; i < patternCount; i++) {
+            std::string derived = applyPatternTransformation(root, patterns[i].name);
+            if (!derived.empty()) {
+                count++;
+                result += std::to_string(count) + ". ";
+                result += derived;
+                result += "  ← ";
+                result += patterns[i].name;
+                result += "\n   (" + patterns[i].description + ")\n\n";
+            }
         }
+        
+        if (count == 0) {
+            result += "Aucun mot dérivé généré.\n";
+        } else {
+            result += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+            result += "Total : " + std::to_string(count) + " mots dérivés\n";
+        }
+        
         return result;
     }
     
@@ -446,8 +463,10 @@ public:
             std::string extractedRoot = extractRootFromWord(word, patterns[i].name);
             
             if (extractedRoot == expectedRoot) {
+                // Sauvegarder les infos avant de libérer la mémoire
+                std::string foundPattern = patterns[i].name;
                 delete[] patterns;
-                return ValidationResult(true, patterns[i].name, expectedRoot);
+                return ValidationResult(true, foundPattern, expectedRoot);
             }
         }
         
@@ -468,8 +487,10 @@ public:
             std::string extractedRoot = extractRootFromWord(word, patterns[i].name);
             
             if (!extractedRoot.empty() && rootTree.contains(extractedRoot)) {
+                // Sauvegarder les infos avant de libérer la mémoire
+                std::string foundPattern = patterns[i].name;
                 delete[] patterns;
-                return ValidationResult(true, patterns[i].name, extractedRoot);
+                return ValidationResult(true, foundPattern, extractedRoot);
             }
         }
         
@@ -482,7 +503,7 @@ public:
      * Complexité : O(n + m)
      */
     std::string getAllRootsAndDerivativesText() {
-        std::vector<AVLNode*> nodes;
+        std::vector<BSTNode*> nodes;
         collectNodesInOrder(rootTree.getRoot(), nodes);
 
         if (nodes.empty()) {
@@ -512,7 +533,7 @@ public:
      * Complexité : O(n)
      */
     std::string getAllRootsText() {
-        std::vector<AVLNode*> nodes;
+        std::vector<BSTNode*> nodes;
         collectNodesInOrder(rootTree.getRoot(), nodes);
         if (nodes.empty()) {
             return "Aucune racine dans l'arbre.";
@@ -555,7 +576,7 @@ public:
         std::vector<std::string> suggestions;
         if (query.empty()) return suggestions;
 
-        std::vector<AVLNode*> nodes;
+        std::vector<BSTNode*> nodes;
         collectNodesInOrder(rootTree.getRoot(), nodes);
         for (const auto* node : nodes) {
             if (node->root.find(query) != std::string::npos) {

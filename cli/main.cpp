@@ -7,6 +7,7 @@
  * ============================================================================
  * INTERFACE UTILISATEUR (CLI)
  * Moteur de Recherche Morphologique Arabe
+ * Structures : ABR + Table de Hachage + Listes Chaînées
  * ============================================================================
  */
 
@@ -48,7 +49,7 @@ void searchRootMenu() {
         return;
     }
     
-    AVLNode* node = engine.findRoot(root);
+    BSTNode* node = engine.findRoot(root);
     
     if (node == nullptr) {
         std::cout << "Racine '" << root << "' non trouvée." << std::endl;
@@ -314,7 +315,7 @@ void displayStatisticsMenu() {
 void rootsMenu() {
     while (true) {
         std::cout << "\n┌────────────────────────────────────────┐\n";
-        std::cout << "│   GESTION DES RACINES (Arbre AVL)     │\n";
+        std::cout << "│   GESTION DES RACINES (Arbre ABR)     │\n";
         std::cout << "└────────────────────────────────────────┘\n\n";
         
         std::cout << "1. Ajouter une racine" << std::endl;

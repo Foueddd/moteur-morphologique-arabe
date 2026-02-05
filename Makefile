@@ -1,94 +1,50 @@
-# ============================================================================
-# MAKEFILE - Moteur de Recherche Morphologique Arabe
-# ============================================================================
-# Compiler : g++ avec support C++11
-
 CXX = g++
-CXXFLAGS = -std=c++11 -Wall -Wextra -O2
-SRCDIR = src
-BINDIR = bin
-TARGET = $(BINDIR)/morphology_engine
-GUI_TARGET = $(BINDIR)/morphology_gui
+CXXFLAGS = -std=c++11 -Wall -Wextra -I./core -I./gui -I./cli -I./utils -fPIC
+QT_CXXFLAGS = $(shell pkg-config --cflags Qt5Widgets Qt5Core Qt5Gui)
+QT_LDFLAGS = $(shell pkg-config --libs Qt5Widgets Qt5Core Qt5Gui)
 
-QT_CFLAGS = $(shell pkg-config --cflags Qt5Widgets 2>/dev/null)
-QT_LIBS = $(shell pkg-config --libs Qt5Widgets 2>/dev/null)
+# Dossiers
+BUILD_DIR = build
+SRC_CORE = core
+SRC_GUI = gui
+SRC_CLI = cli
+SRC_UTILS = utils
 
-# Fichiers sources
-SOURCES = $(SRCDIR)/main.cpp
-HEADERS = $(SRCDIR)/structs.h $(SRCDIR)/avl_tree.h $(SRCDIR)/hash_table.h \
-          $(SRCDIR)/morphology_engine.h $(SRCDIR)/utils.h
+all: cli gui
 
-GUI_SOURCES = $(SRCDIR)/gui_main.cpp $(SRCDIR)/gui_window.cpp
-GUI_HEADERS = $(SRCDIR)/gui_window.h
+cli:
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(SRC_CLI)/main.cpp -o $(BUILD_DIR)/morphology_engine
+	@echo "✓ CLI compilé: $(BUILD_DIR)/morphology_engine"
 
-# Fichiers objets
-OBJECTS = $(SOURCES:.cpp=.o)
-GUI_OBJECTS = $(GUI_SOURCES:.cpp=.o)
+gui: $(BUILD_DIR)/gui_window.o $(BUILD_DIR)/gui_main.o $(BUILD_DIR)/moc_gui_window.o
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(BUILD_DIR)/gui_window.o $(BUILD_DIR)/gui_main.o $(BUILD_DIR)/moc_gui_window.o $(QT_LDFLAGS) -o $(BUILD_DIR)/morphology_gui
+	@echo "✓ GUI compilé: $(BUILD_DIR)/morphology_gui"
 
-# ============================================================================
-# RÈGLES DE COMPILATION
-# ============================================================================
+$(BUILD_DIR)/gui_window.o: $(SRC_GUI)/gui_window.cpp $(SRC_GUI)/gui_window.h
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(QT_CXXFLAGS) -c $(SRC_GUI)/gui_window.cpp -o $(BUILD_DIR)/gui_window.o
 
-all: $(TARGET)
+$(BUILD_DIR)/gui_main.o: $(SRC_GUI)/gui_main.cpp
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(QT_CXXFLAGS) -c $(SRC_GUI)/gui_main.cpp -o $(BUILD_DIR)/gui_main.o
 
-# Créer le répertoire bin s'il n'existe pas
-$(BINDIR):
-	@mkdir -p $(BINDIR)
+$(BUILD_DIR)/moc_gui_window.cpp: $(SRC_GUI)/gui_window.h
+	@mkdir -p $(BUILD_DIR)
+	moc $(SRC_GUI)/gui_window.h -o $(BUILD_DIR)/moc_gui_window.cpp
 
-# Compilation de main.cpp
-$(SRCDIR)/main.o: $(SRCDIR)/main.cpp $(HEADERS)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+$(BUILD_DIR)/moc_gui_window.o: $(BUILD_DIR)/moc_gui_window.cpp
+	$(CXX) $(CXXFLAGS) $(QT_CXXFLAGS) -c $(BUILD_DIR)/moc_gui_window.cpp -o $(BUILD_DIR)/moc_gui_window.o
 
-
-$(SRCDIR)/gui_main.o: $(SRCDIR)/gui_main.cpp $(HEADERS) $(GUI_HEADERS)
-	$(CXX) $(CXXFLAGS) -fPIC $(QT_CFLAGS) -c $< -o $@
-
-$(SRCDIR)/gui_window.o: $(SRCDIR)/gui_window.cpp $(HEADERS) $(GUI_HEADERS)
-	$(CXX) $(CXXFLAGS) -fPIC $(QT_CFLAGS) -c $< -o $@
-
-# Édition des liens (créer l'exécutable)
-$(TARGET): $(BINDIR) $(OBJECTS)
-	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $@
-	@echo "✓ Compilation réussie!"
-	@echo "  Exécutable: $(TARGET)"
-	@echo "  Pour lancer: ./$(TARGET)"
-
-gui: $(BINDIR) $(GUI_OBJECTS)
-	$(CXX) $(CXXFLAGS) $(GUI_OBJECTS) -o $(GUI_TARGET) $(QT_LIBS)
-	@echo "✓ GUI compilée!"
-	@echo "  Exécutable: $(GUI_TARGET)"
-	@echo "  Pour lancer: ./$(GUI_TARGET)"
-
-# Nettoyage des fichiers objets
 clean:
-	@rm -f $(SRCDIR)/*.o
-	@echo "✓ Fichiers objets supprimés."
+	rm -f $(BUILD_DIR)/morphology_engine $(BUILD_DIR)/morphology_gui $(BUILD_DIR)/*.o $(BUILD_DIR)/moc_*.cpp
+	@echo "✓ Nettoyage terminé"
 
-# Nettoyage complet
-distclean: clean
-	@rm -rf $(BINDIR)
-	@echo "✓ Répertoire bin supprimé."
+run-cli: cli
+	./$(BUILD_DIR)/morphology_engine
 
-# Compilation et lancement
-run: $(TARGET)
-	./$(TARGET)
+run-gui: gui
+	./$(BUILD_DIR)/morphology_gui
 
-# Compilation en mode debug
-debug: CXXFLAGS += -g -DDEBUG
-debug: clean $(TARGET)
-	@echo "✓ Compilation en mode DEBUG terminée."
-
-# Affiche l'aide
-help:
-	@echo "========================="
-	@echo "Cibles disponibles:"
-	@echo "========================="
-	@echo "make           - Compiler le projet"
-	@echo "make gui       - Compiler l'interface graphique Qt"
-	@echo "make run       - Compiler et lancer l'application"
-	@echo "make clean     - Supprimer les fichiers objets"
-	@echo "make distclean - Supprimer tout"
-	@echo "make debug     - Compiler en mode debug"
-	@echo "make help      - Afficher cette aide"
-
-.PHONY: all gui clean distclean run debug help
+.PHONY: all cli gui clean run-cli run-gui
