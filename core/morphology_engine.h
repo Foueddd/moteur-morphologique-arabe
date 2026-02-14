@@ -9,22 +9,10 @@
 #include <string>
 #include <vector>
 
-/**
- * ============================================================================
- * MOTEUR DE DÉRIVATION ET VALIDATION MORPHOLOGIQUE
- * Moteur de Recherche Morphologique Arabe
- * ============================================================================
- * 
- * Responsabilités:
- * 1. Génération de mots dérivés (racine + schème = mot)
- * 2. Validation morphologique (mot + racine = est-ce valide?)
- * 3. Gestion des transformations morphologiques
- */
-
 class MorphologyEngine {
 private:
-    BSTree rootTree;                  // Arbre ABR des racines
-    PatternHashTable patternTable;     // Table de hachage des schèmes
+    BSTree rootTree;
+    PatternHashTable patternTable;
 
     void collectNodesInOrder(BSTNode* node, std::vector<BSTNode*>& out) const {
         if (node == nullptr) return;
@@ -33,171 +21,66 @@ private:
         collectNodesInOrder(node->right, out);
     }
     
-    /**
-     * Applique la transformation d'un schème simple
-     * Exemple : كتب + مفعول = مكتوب
-     * 
-     * Structure des schèmes :
-     * - فاعل : place la racine trilatérale avec voyelle 'a'
-     * - مفعول : préfixe 'م' + racine + suffixe 'ول'
-     * - افتعل : préfixe 'ا' + racine + suffixe 'ل'
-     * - تفعيل : préfixe 'ت' + racine + suffixe 'يل'
-     * 
-     * Complexité : O(k) où k = longueur du mot généré
-     */
+    // Génère un mot dérivé à partir d'une racine et d'un schème
+    // Méthode dynamique : les lettres ف/ع/ل dans le nom du schème
+    // indiquent les positions de C1/C2/C3 de la racine.
+    // Tout autre caractère du schème est copié tel quel.
     std::string applyPatternTransformation(const std::string& root, const std::string& patternName) {
         Pattern* pattern = patternTable.search(patternName);
         
         if (pattern == nullptr) {
-            return "";  // Schème non trouvé
+            return "";
         }
-        
-        // Extraction des lettres de la racine trilatérale (UTF-8)
         std::vector<std::string> r = Utils::utf8Split(root);
+        if (r.size() < 3) return "";
+        
+        std::vector<std::string> p = Utils::utf8Split(patternName);
         std::string derived = "";
         
-        if (patternName == "فاعل") {
-            // فاعل : Premier radical + 'a' + Second radical + Second radical
-            if (r.size() >= 3) {
-                derived = r[0];
-                derived += "ا";
-                derived += r[1];
-                derived += r[2];
-            }
-        }
-        else if (patternName == "مفعول") {
-            // مفعول : 'م' + Premier radical + Second radical + 'و' + Troisième radical
-            if (r.size() >= 3) {
-                derived = "م";
+        for (size_t i = 0; i < p.size(); i++) {
+            if (p[i] == "\xd9\x81") {        // ف → C1
                 derived += r[0];
+            } else if (p[i] == "\xd8\xb9") { // ع → C2
                 derived += r[1];
-                derived += "و";
+            } else if (p[i] == "\xd9\x84") { // ل → C3
                 derived += r[2];
+            } else {
+                derived += p[i];              // caractère littéral
             }
-        }
-        else if (patternName == "افتعل") {
-            // افتعل : 'ا' + Premier radical + 'ت' + Second radical + Troisième radical
-            if (r.size() >= 3) {
-                derived = "ا";
-                derived += r[0];
-                derived += "ت";
-                derived += r[1];
-                derived += r[2];
-            }
-        }
-        else if (patternName == "تفعيل") {
-            // تفعيل : 'ت' + Premier radical + Second radical + 'ي' + Troisième radical
-            if (r.size() >= 3) {
-                derived = "ت";
-                derived += r[0];
-                derived += r[1];
-                derived += "ي";
-                derived += r[2];
-            }
-        }
-        else if (patternName == "مفعال") {
-            // مفعال : 'م' + Premier radical + Second radical + 'ا' + Troisième radical
-            if (r.size() >= 3) {
-                derived = "م";
-                derived += r[0];
-                derived += r[1];
-                derived += "ا";
-                derived += r[2];
-            }
-        }
-        else if (patternName == "فعال") {
-            // فعال : Premier + Second + 'ا' + Troisième (pluriel)
-            if (r.size() >= 3) {
-                derived = r[0];
-                derived += r[1];
-                derived += "ا";
-                derived += r[2];
-            }
-        }
-        else {
-            // Schème personnalisé : retourner le nom du schème comme exemple
-            derived = pattern->name;
         }
         
         return derived;
     }
-    
-    /**
-     * Inverse la transformation pour extraire la racine d'un mot
-     * Exemple : مكتوب + مفعول = كتب
-     * Complexité : O(k)
-     */
+    // Extrait une racine selon un schème connu
+    // Méthode dynamique : compare le mot et le schème caractère par caractère
+    // Les positions de ف/ع/ل dans le schème indiquent où trouver C1/C2/C3
     std::string extractRootFromWord(const std::string& word, const std::string& patternName) {
-        std::string root = "";
         std::vector<std::string> w = Utils::utf8Split(word);
+        std::vector<std::string> p = Utils::utf8Split(patternName);
         
-        if (patternName == "فاعل") {
-            // فاعل : لآخر (mot = فاعل) => racine = الحروف 1, 3, 4
-            if (w.size() >= 4) {
-                root = w[0];
-                root += w[2];
-                root += w[3];
-            }
-        }
-        else if (patternName == "مفعول") {
-            // مفعول : 'م' + R1 + R2 + 'و' + R3
-            if (w.size() >= 5) {
-                root = w[1];
-                root += w[2];
-                root += w[4];
-            }
-        }
-        else if (patternName == "افتعل") {
-            // افتعل : 'ا' + R1 + 'ت' + R2 + R3
-            if (w.size() >= 5) {
-                root = w[1];
-                root += w[3];
-                root += w[4];
-            }
-        }
-        else if (patternName == "تفعيل") {
-            // تفعيل : 'ت' + R1 + R2 + 'ي' + R3
-            if (w.size() >= 5) {
-                root = w[1];
-                root += w[2];
-                root += w[4];
-            }
-        }
-        else if (patternName == "مفعال") {
-            // مفعال : 'م' + R1 + R2 + 'ا' + R3
-            if (w.size() >= 5) {
-                root = w[1];
-                root += w[2];
-                root += w[4];
-            }
-        }
-        else if (patternName == "فعال") {
-            // فعال : R1 + R2 + 'ا' + R3
-            if (w.size() >= 4) {
-                root = w[0];
-                root += w[1];
-                root += w[3];
+        // Le mot et le schème doivent avoir la même longueur en caractères
+        if (w.size() != p.size()) return "";
+        
+        std::string c1 = "", c2 = "", c3 = "";
+        
+        for (size_t i = 0; i < p.size(); i++) {
+            if (p[i] == "\xd9\x81") {        // ف → C1
+                c1 = w[i];
+            } else if (p[i] == "\xd8\xb9") { // ع → C2
+                c2 = w[i];
+            } else if (p[i] == "\xd9\x84") { // ل → C3
+                c3 = w[i];
             }
         }
         
-        return root;
+        // Vérifier que les 3 radicaux ont été trouvés
+        if (c1.empty() || c2.empty() || c3.empty()) return "";
+        return c1 + c2 + c3;
     }
     
 public:
-    // ========================================================================
-    // CONSTRUCTEUR
-    // ========================================================================
-    
     MorphologyEngine() {}
-    
-    // ========================================================================
-    // GESTION DES RACINES
-    // ========================================================================
-    
-    /**
-     * Ajoute une racine à l'arbre ABR
-     * Complexité : O(log n)
-     */
+    // Ajoute une racine à l’ABR
     void addRoot(const std::string& root) {
         if (rootTree.contains(root)) {
             std::cout << "Racine '" << root << "' existe déjà." << std::endl;
@@ -206,11 +89,13 @@ public:
             std::cout << "Racine '" << root << "' ajoutée avec succès." << std::endl;
         }
     }
-
-    /**
-     * Supprime une racine de l'arbre ABR
-     * Complexité : O(log n)
-     */
+    // Construit un ABR équilibré à partir d’une liste
+    void loadRootsBalanced(std::vector<std::string>& roots) {
+        rootTree.buildBalanced(roots);
+        std::cout << "✓ ABR équilibré construit avec " << rootTree.getSize()
+                  << " racines." << std::endl;
+    }
+    // Supprime une racine
     bool removeRoot(const std::string& root) {
         if (!rootTree.contains(root)) {
             return false;
@@ -218,132 +103,63 @@ public:
         rootTree.remove(root);
         return true;
     }
-    
-    /**
-     * Cherche une racine
-     * Complexité : O(log n)
-     */
     BSTNode* findRoot(const std::string& root) {
         return rootTree.search(root);
     }
-    
-    /**
-     * Vérifie si une racine existe
-     * Complexité : O(log n)
-     */
     bool rootExists(const std::string& root) {
         return rootTree.contains(root);
     }
-    
-    /**
-     * Affiche toutes les racines
-     * Complexité : O(n)
-     */
     void displayAllRoots() {
         rootTree.displayAll();
     }
-    
-    // ========================================================================
-    // GESTION DES SCHÈMES
-    // ========================================================================
-    
-    /**
-     * Ajoute un schème morphologique à la table de hachage
-     * Complexité : O(1) en moyenne
-     */
     bool addPattern(const Pattern& pattern) {
         return patternTable.insert(pattern);
     }
 
-    /**
-     * Met à jour un schème (réinsertion)
-     * Complexité : O(1) en moyenne
-     */
     bool updatePattern(const Pattern& pattern) {
         return patternTable.insert(pattern);
     }
 
-    /**
-     * Supprime un schème
-     * Complexité : O(1) en moyenne
-     */
     bool removePattern(const std::string& patternName) {
         return patternTable.remove(patternName);
     }
-    
-    /**
-     * Cherche un schème
-     * Complexité : O(1) en moyenne
-     */
     Pattern* findPattern(const std::string& patternName) {
         return patternTable.search(patternName);
     }
-    
-    /**
-     * Affiche tous les schèmes
-     * Complexité : O(n)
-     */
     void displayAllPatterns() {
         patternTable.displayAll();
     }
-    
-    /**
-     * Retourne le nombre de schèmes
-     */
     int getPatternCount() {
         return patternTable.getSize();
     }
-    
-    /**
-     * Retourne le facteur de charge de la table
-     */
     double getHashTableLoadFactor() {
         return patternTable.getLoadFactor();
     }
-    
-    // ========================================================================
-    // GÉNÉRATION MORPHOLOGIQUE
-    // ========================================================================
-    
-    /**
-     * Génère un mot dérivé à partir d'une racine et d'un schème
-     * Complexité : O(log n + k) où n = racines, k = longueur du mot
-     */
+    // Génère un mot et l’ajoute à la liste des dérivés
     std::string generateDerivedWord(const std::string& root, const std::string& patternName) {
         if (!Utils::isValidArabicRoot(root)) {
             std::cout << "Erreur: Racine invalide (doit être trilitérale)." << std::endl;
             return "";
         }
-        // Vérifier que la racine existe
         if (!rootTree.contains(root)) {
             std::cout << "Erreur: Racine '" << root << "' non trouvée." << std::endl;
             return "";
         }
-        
-        // Vérifier que le schème existe
         if (!patternTable.contains(patternName)) {
             std::cout << "Erreur: Schème '" << patternName << "' non trouvé." << std::endl;
             return "";
         }
-        
-        // Générer le mot
         std::string derived = applyPatternTransformation(root, patternName);
         
         if (derived.empty()) {
             std::cout << "Erreur: Impossible de générer le mot." << std::endl;
             return "";
         }
-        
-        // Ajouter automatiquement le mot dérivé à la liste de la racine
         addDerivedWordToRoot(root, derived, patternName);
         
         return derived;
     }
-    
-    /**
-     * Ajoute un mot dérivé à la liste de la racine
-     * Complexité : O(log n)
-     */
+    // Ajoute un dérivé à la liste de la racine
     bool addDerivedWordToRoot(const std::string& root, const std::string& word, const std::string& pattern) {
         BSTNode* node = rootTree.search(root);
         
@@ -351,8 +167,6 @@ public:
             std::cout << "Erreur: Racine '" << root << "' non trouvée." << std::endl;
             return false;
         }
-        
-        // Vérifier si le mot existe déjà
         DerivedWord* current = node->derivedList;
         while (current != nullptr) {
             if (current->word == word) {
@@ -361,19 +175,12 @@ public:
             }
             current = current->next;
         }
-        
-        // Ajouter le mot en tête de liste
         DerivedWord* newWord = new DerivedWord(word, pattern, 1);
         newWord->next = node->derivedList;
         node->derivedList = newWord;
         
         return true;
     }
-    
-    /**
-     * Affiche tous les mots dérivés d'une racine
-     * Complexité : O(log n + m) où m = nombre de dérivés
-     */
     void displayDerivedWordsOfRoot(const std::string& root) {
         BSTNode* node = rootTree.search(root);
         
@@ -400,17 +207,11 @@ public:
         }
     }
 
-    /**
-     * Retourne la famille morphologique d'une racine sous forme textuelle
-     * Complexité : O(log n + m)
-     */
     std::string getDerivedWordsText(const std::string& root) {
         BSTNode* node = rootTree.search(root);
         if (node == nullptr) {
             return "Racine non trouvée.";
         }
-
-        // Générer les mots dérivés automatiquement avec tous les schèmes
         std::string result = "\n📚 MOTS DÉRIVÉS GÉNÉRÉS :\n";
         result += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
         
@@ -440,22 +241,10 @@ public:
         return result;
     }
     
-    // ========================================================================
-    // VALIDATION MORPHOLOGIQUE
-    // ========================================================================
-    
-    /**
-     * Valide si un mot appartient morphologiquement à une racine donnée
-     * Essaie tous les schèmes pour voir lequel reconstruit la racine
-     * Complexité : O(m * k) où m = nombre de schèmes, k = longueur du mot
-     */
     ValidationResult validateWord(const std::string& word, const std::string& expectedRoot) {
-        // Vérifier que la racine existe
         if (!rootTree.contains(expectedRoot)) {
             return ValidationResult(false, "", "");
         }
-        
-        // Essayer chaque schème
         int patternCount = 0;
         Pattern* patterns = patternTable.getAllPatterns(patternCount);
         
@@ -463,7 +252,6 @@ public:
             std::string extractedRoot = extractRootFromWord(word, patterns[i].name);
             
             if (extractedRoot == expectedRoot) {
-                // Sauvegarder les infos avant de libérer la mémoire
                 std::string foundPattern = patterns[i].name;
                 delete[] patterns;
                 return ValidationResult(true, foundPattern, expectedRoot);
@@ -473,12 +261,6 @@ public:
         delete[] patterns;
         return ValidationResult(false, "", "");
     }
-    
-    /**
-     * Cherche la racine d'un mot en essayant tous les schèmes
-     * Retourne la première racine trouvée
-     * Complexité : O(m * n * k) où m = schèmes, n = racines, k = longueur
-     */
     ValidationResult findRootOfWord(const std::string& word) {
         int patternCount = 0;
         Pattern* patterns = patternTable.getAllPatterns(patternCount);
@@ -487,7 +269,6 @@ public:
             std::string extractedRoot = extractRootFromWord(word, patterns[i].name);
             
             if (!extractedRoot.empty() && rootTree.contains(extractedRoot)) {
-                // Sauvegarder les infos avant de libérer la mémoire
                 std::string foundPattern = patterns[i].name;
                 delete[] patterns;
                 return ValidationResult(true, foundPattern, extractedRoot);
@@ -497,11 +278,6 @@ public:
         delete[] patterns;
         return ValidationResult(false, "", "");
     }
-
-    /**
-     * Retourne toutes les racines avec leurs dérivés (format texte)
-     * Complexité : O(n + m)
-     */
     std::string getAllRootsAndDerivativesText() {
         std::vector<BSTNode*> nodes;
         collectNodesInOrder(rootTree.getRoot(), nodes);
@@ -528,10 +304,6 @@ public:
         return result;
     }
 
-    /**
-     * Retourne la liste des racines (format texte)
-     * Complexité : O(n)
-     */
     std::string getAllRootsText() {
         std::vector<BSTNode*> nodes;
         collectNodesInOrder(rootTree.getRoot(), nodes);
@@ -548,10 +320,6 @@ public:
         return result;
     }
 
-    /**
-     * Retourne la liste des schèmes (format texte)
-     * Complexité : O(n)
-     */
     std::string getAllPatternsText() {
         int count = 0;
         Pattern* patterns = patternTable.getAllPatterns(count);
@@ -568,39 +336,9 @@ public:
         return result;
     }
 
-    /**
-     * Suggestions simples: racines contenant la requête
-     * Complexité : O(n * k)
-     */
-    std::vector<std::string> suggestRoots(const std::string& query) {
-        std::vector<std::string> suggestions;
-        if (query.empty()) return suggestions;
-
-        std::vector<BSTNode*> nodes;
-        collectNodesInOrder(rootTree.getRoot(), nodes);
-        for (const auto* node : nodes) {
-            if (node->root.find(query) != std::string::npos) {
-                suggestions.push_back(node->root);
-            }
-        }
-        return suggestions;
-    }
-    
-    // ========================================================================
-    // UTILITAIRES
-    // ========================================================================
-    
-    /**
-     * Retourne le nombre total de racines
-     */
     int getRootCount() {
         return rootTree.getSize();
     }
-    
-    /**
-     * Génère et ajoute tous les dérivés d'une racine pour tous les schèmes
-     * Complexité : O(log n + m * k)
-     */
     void generateAllDerivativesForRoot(const std::string& root) {
         if (!rootTree.contains(root)) {
             std::cout << "Erreur: Racine '" << root << "' non trouvée." << std::endl;
@@ -615,7 +353,7 @@ public:
         for (int i = 0; i < patternCount; i++) {
             std::string derived = generateDerivedWord(root, patterns[i].name);
             if (!derived.empty()) {
-                addDerivedWordToRoot(root, derived, patterns[i].name);
+                // generateDerivedWord() ajoute déjà le dérivé à la liste
                 std::cout << "  + " << patterns[i].name << " => " << derived << std::endl;
             }
         }

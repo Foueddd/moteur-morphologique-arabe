@@ -50,3 +50,17 @@ Thumbs.db
 *.qrc
 *.rcc
 *.qmlc
+
+# Debug and logs
+*.log
+debug/
+*.dSYM/
+
+# Backup files
+*.bak
+*.orig
+*~.nib
+
+# Compiled files
+*.user
+*.pro.user*

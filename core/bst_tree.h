@@ -2,82 +2,67 @@
 #define BST_TREE_H
 
 #include "structs.h"
+#include "utils.h"
 #include <algorithm>
 #include <iostream>
-
-/**
- * ============================================================================
- * IMPLÉMENTATION DE L'ARBRE BINAIRE DE RECHERCHE (ABR) SIMPLE
- * Moteur de Recherche Morphologique Arabe
- * ============================================================================
- * 
- * ABR CLASSIQUE SANS ÉQUILIBRAGE
- * 
- * Complexité:
- * - Insertion : O(h) où h = hauteur (O(n) pire cas, O(log n) cas moyen)
- * - Recherche : O(h) où h = hauteur (O(n) pire cas, O(log n) cas moyen)
- * - Suppression : O(h) où h = hauteur
- * - Parcours : O(n)
- */
+#include <vector>
 
 class BSTree {
 private:
     BSTNode* root;
-    
-    // ========================================================================
-    // FONCTIONS UTILITAIRES PRIVÉES POUR ABR SIMPLE
-    // ========================================================================
-    
-    /**
-     * Insère une racine dans le sous-arbre (ABR SIMPLE - SANS ÉQUILIBRAGE)
-     * Complexité : O(h) où h = hauteur de l'arbre
-     */
-    BSTNode* insertNode(BSTNode* node, const std::string& rootKey) {
-        // Insertion standard BST (sans équilibrage)
-        if (node == nullptr) {
-            return new BSTNode(rootKey);
-        }
+
+    // Pair racine + clé numérique pour tri et construction équilibrée
+    struct RootEntry {
+        std::string root;
+        int key;
+    };
+    // Construit un ABR équilibré à partir d’un tableau trié par clé
+    BSTNode* buildBalancedRecursive(std::vector<RootEntry>& entries, int start, int end) {
+        if (start > end) return nullptr;
         
-        if (rootKey < node->root) {
-            node->left = insertNode(node->left, rootKey);
-        } else if (rootKey > node->root) {
-            node->right = insertNode(node->right, rootKey);
+        int mid = (start + end) / 2;
+        BSTNode* node = new BSTNode(entries[mid].root, entries[mid].key);
+        node->left = buildBalancedRecursive(entries, start, mid - 1);
+        node->right = buildBalancedRecursive(entries, mid + 1, end);
+        int lh = (node->left) ? node->left->height : 0;
+        int rh = (node->right) ? node->right->height : 0;
+        node->height = 1 + std::max(lh, rh);
+        
+        return node;
+    }
+    // Insertion par clé numérique
+    BSTNode* insertNode(BSTNode* node, const std::string& rootStr, int key) {
+        if (node == nullptr) {
+            return new BSTNode(rootStr, key);
+        }
+        if (key < node->key) {
+            node->left = insertNode(node->left, rootStr, key);
+        } else if (key > node->key) {
+            node->right = insertNode(node->right, rootStr, key);
         } else {
-            // Racine existe déjà
             return node;
         }
-        
-        // 2. Mettre à jour la hauteur (pour information seulement)
         int leftHeight = (node->left != nullptr) ? node->left->height : 0;
         int rightHeight = (node->right != nullptr) ? node->right->height : 0;
         node->height = 1 + std::max(leftHeight, rightHeight);
         
-        // PAS D'ÉQUILIBRAGE - C'EST UN ABR SIMPLE !
         return node;
     }
-    
-    /**
-     * Recherche une racine dans le sous-arbre
-     * Complexité : O(h) où h = hauteur (O(n) pire cas, O(log n) cas moyen)
-     */
-    BSTNode* searchNode(BSTNode* node, const std::string& rootKey) {
+    // Recherche par clé numérique
+    BSTNode* searchNode(BSTNode* node, int key) {
         if (node == nullptr) {
             return nullptr;
         }
-        
-        if (rootKey == node->root) {
+        if (key == node->key) {
             return node;
-        } else if (rootKey < node->root) {
-            return searchNode(node->left, rootKey);
+        } else if (key < node->key) {
+            return searchNode(node->left, key);
         } else {
-            return searchNode(node->right, rootKey);
+            return searchNode(node->right, key);
         }
     }
     
-    /**
-     * Libère la mémoire d'une liste de dérivés
-     * Complexité : O(m)
-     */
+    // Libère une liste de dérivés
     void deleteDerivedList(DerivedWord* list) {
         DerivedWord* current = list;
         while (current != nullptr) {
@@ -87,10 +72,7 @@ private:
         }
     }
 
-    /**
-     * Libère la mémoire d'un sous-arbre
-     * Complexité : O(n)
-     */
+    // Libère tout l’arbre
     void deleteTree(BSTNode* node) {
         if (node == nullptr) return;
         
@@ -101,10 +83,6 @@ private:
         delete node;
     }
 
-    /**
-     * Retourne le nœud avec la plus petite clé (successeur)
-     * Complexité : O(log n)
-     */
     BSTNode* minValueNode(BSTNode* node) {
         BSTNode* current = node;
         while (current && current->left != nullptr) {
@@ -113,77 +91,55 @@ private:
         return current;
     }
 
-    /**
-     * Supprime une racine du sous-arbre (ABR SIMPLE - SANS RÉÉQUILIBRAGE)
-     * Complexité : O(h)
-     */
-    BSTNode* deleteNode(BSTNode* node, const std::string& rootKey) {
+    // Suppression par clé numérique
+    BSTNode* deleteNode(BSTNode* node, int key) {
         if (node == nullptr) {
             return node;
         }
 
-        if (rootKey < node->root) {
-            node->left = deleteNode(node->left, rootKey);
-        } else if (rootKey > node->root) {
-            node->right = deleteNode(node->right, rootKey);
+        if (key < node->key) {
+            node->left = deleteNode(node->left, key);
+        } else if (key > node->key) {
+            node->right = deleteNode(node->right, key);
         } else {
-            // Nœud trouvé
-
-            // Cas 1: aucun enfant ou 1 seul enfant
             if (node->left == nullptr || node->right == nullptr) {
                 BSTNode* child = (node->left != nullptr) ? node->left : node->right;
 
                 if (child == nullptr) {
-                    // Aucun enfant
                     deleteDerivedList(node->derivedList);
                     delete node;
                     node = nullptr;
                 } else {
-                    // Un seul enfant: remplacer le nœud par son enfant
                     BSTNode* old = node;
                     node = child;
                     deleteDerivedList(old->derivedList);
                     delete old;
                 }
             } else {
-                // Cas 2: deux enfants
-                // On prend le successeur (min du sous-arbre droit)
                 BSTNode* succ = minValueNode(node->right);
-
-                // Copier la clé du successeur dans le nœud courant
                 node->root = succ->root;
-
-                // Échanger la liste dérivée (pour garder la cohérence)
+                node->key = succ->key;
                 std::swap(node->derivedList, succ->derivedList);
-
-                // Supprimer le successeur (IMPORTANT : supprimer succ->root)
-                node->right = deleteNode(node->right, succ->root);
+                node->right = deleteNode(node->right, succ->key);
             }
         }
 
         if (node == nullptr) return node;
 
-        // Mettre à jour la hauteur (pour information uniquement)
         int leftHeight = (node->left != nullptr) ? node->left->height : 0;
         int rightHeight = (node->right != nullptr) ? node->right->height : 0;
         node->height = 1 + std::max(leftHeight, rightHeight);
 
-        // PAS DE RÉÉQUILIBRAGE - C'EST UN ABR SIMPLE !
         return node;
     }
     
-    /**
-     * Parcours en ordre (InOrder) : affiche les racines triées
-     * Complexité : O(n)
-     */
+    // Parcours en ordre (racines triées)
     void inorderTraversal(BSTNode* node) {
         if (node == nullptr) return;
         
         inorderTraversal(node->left);
         
-        std::cout << "  Racine: " << node->root << " (Hauteur: " << node->height << ")" << std::endl;
-        
-        // Afficher les mots dérivés
+        std::cout << "  Racine: " << node->root << " (Clé: " << node->key << ", Hauteur: " << node->height << ")" << std::endl;
         if (node->derivedList != nullptr) {
             std::cout << "    Dérivés : ";
             DerivedWord* current = node->derivedList;
@@ -198,48 +154,29 @@ private:
     }
     
 public:
-    // ========================================================================
-    // CONSTRUCTEUR ET DESTRUCTEUR
-    // ========================================================================
-    
     BSTree() : root(nullptr) {}
     
     ~BSTree() {
         deleteTree(root);
     }
-    
-    // ========================================================================
-    // OPÉRATIONS PUBLIQUES
-    // ========================================================================
-    
-    /**
-     * Insère une nouvelle racine dans l'arbre ABR (sans équilibrage)
-     * Complexité : O(h) où h = hauteur
-     */
+    // Calcule la clé puis insère
     void insert(const std::string& rootStr) {
-        root = insertNode(root, rootStr);
+        int key = Utils::computeRootKey(rootStr);
+        if (key <= 0) return;
+        root = insertNode(root, rootStr, key);
     }
-    
-    /**
-     * Recherche une racine et retourne le nœud
-     * Complexité : O(h)
-     */
+    // Recherche par racine (clé calculée)
     BSTNode* search(const std::string& rootStr) {
-        return searchNode(root, rootStr);
+        int key = Utils::computeRootKey(rootStr);
+        if (key <= 0) return nullptr;
+        return searchNode(root, key);
     }
-    
-    /**
-     * Vérifie si une racine existe
-     * Complexité : O(h)
-     */
+    // Vérifie l’existence d’une racine
     bool contains(const std::string& rootStr) {
-        return searchNode(root, rootStr) != nullptr;
+        int key = Utils::computeRootKey(rootStr);
+        if (key <= 0) return false;
+        return searchNode(root, key) != nullptr;
     }
-    
-    /**
-     * Retourne le nombre de nœuds (racines)
-     * Complexité : O(n)
-     */
     int countNodes(BSTNode* node) {
         if (node == nullptr) return 0;
         return 1 + countNodes(node->left) + countNodes(node->right);
@@ -249,10 +186,7 @@ public:
         return countNodes(root);
     }
     
-    /**
-     * Affiche toutes les racines avec la structure de l'arbre
-     * Complexité : O(n)
-     */
+    // Affiche toutes les racines
     void displayAll() {
         if (root == nullptr) {
             std::cout << "Aucune racine dans l'arbre." << std::endl;
@@ -263,19 +197,42 @@ public:
         std::cout << "\nTotal de racines : " << getSize() << std::endl;
     }
     
-    /**
-     * Retourne le nœud racine de l'arbre
-     */
     BSTNode* getRoot() {
         return root;
     }
 
-    /**
-     * Supprime une racine de l'arbre ABR (sans rééquilibrage)
-     * Complexité : O(h)
-     */
+    // Supprime une racine
     void remove(const std::string& rootStr) {
-        root = deleteNode(root, rootStr);
+        int key = Utils::computeRootKey(rootStr);
+        if (key <= 0) return;
+        root = deleteNode(root, key);
+    }
+    // Construction équilibrée : encodage → tri → médiane
+    void buildBalanced(std::vector<std::string>& roots) {
+        std::vector<RootEntry> entries;
+        for (size_t i = 0; i < roots.size(); i++) {
+            RootEntry e;
+            e.root = roots[i];
+            e.key = Utils::computeRootKey(roots[i]);
+            if (e.key > 0) {
+                entries.push_back(e);
+            }
+        }
+        std::sort(entries.begin(), entries.end(),
+                  [](const RootEntry& a, const RootEntry& b) {
+                      return a.key < b.key;
+                  });
+        entries.erase(
+            std::unique(entries.begin(), entries.end(),
+                [](const RootEntry& a, const RootEntry& b) {
+                    return a.key == b.key;
+                }),
+            entries.end());
+        deleteTree(root);
+        root = nullptr;
+        if (!entries.empty()) {
+            root = buildBalancedRecursive(entries, 0, (int)entries.size() - 1);
+        }
     }
 };
 

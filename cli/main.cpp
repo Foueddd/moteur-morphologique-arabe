@@ -213,9 +213,7 @@ void generateDerivedWordMenu() {
     
     if (!derived.empty()) {
         Utils::printGenerationResult(root, pattern, derived);
-        
-        // Ajouter le mot à la liste des dérivés
-        engine.addDerivedWordToRoot(root, derived, pattern);
+        // Le mot est déjà ajouté à la liste des dérivés par generateDerivedWord()
     }
 }
 
@@ -466,19 +464,18 @@ int main() {
         
         std::cout << "\n✓ Moteur morphologique initialisé." << std::endl;
 
-        // Chargement initial des racines depuis data/roots.txt
+        // Chargement des racines : Collecte → Encodage → Tri → Insertion médiane
         const std::string rootsFile = "data/roots.txt";
         if (Utils::fileExists(rootsFile)) {
             std::vector<std::string> roots = Utils::loadRootsFromFile(rootsFile);
-            int loaded = 0;
+            std::vector<std::string> validRoots;
             for (const auto& r : roots) {
                 if (Utils::isValidArabicRoot(r)) {
-                    engine.addRoot(r);
-                    loaded++;
+                    validRoots.push_back(r);
                 }
             }
-            if (loaded > 0) {
-                std::cout << "✓ " << loaded << " racines chargées depuis " << rootsFile << std::endl;
+            if (!validRoots.empty()) {
+                engine.loadRootsBalanced(validRoots);
             }
         }
         

@@ -4,215 +4,160 @@
 #include "structs.h"
 #include <iostream>
 
-/**
- * ============================================================================
- * TABLE DE HACHAGE POUR LA GESTION DES SCHÈMES MORPHOLOGIQUES
- * Moteur de Recherche Morphologique Arabe
- * ============================================================================
- * 
- * Méthode : Adressage ouvert avec sondage linéaire
- * Fonction de hachage : Fonction simple basée sur les caractères
- * 
- * Complexité:
- * - Insertion : O(1) en moyenne, O(n) pire cas
- * - Recherche : O(1) en moyenne, O(n) pire cas
- * - Suppression : O(1) en moyenne, O(n) pire cas
- */
-
 class ArabicHashFunction {
 public:
-    /**
-     * Fonction de hachage simple pour chaînes (y compris arabes)
-     * Utilise la technique djb2 (algorithme simple et efficace)
-     * Complexité : O(k) où k = longueur de la clé
-     */
+    // djb2 : hash simple pour chaînes UTF-8
     static unsigned int hash(const std::string& key) {
-        unsigned int hash = 5381;  // Constante djb2
+        unsigned int hash = 5381;
         
         for (unsigned char c : key) {
-            // hash * 33 + c
             hash = ((hash << 5) + hash) + c;
         }
         
         return hash;
     }
 };
-
-/**
- * Table de hachage pour les schèmes morphologiques
- * Utilise le sondage linéaire pour résoudre les collisions
- */
 class PatternHashTable {
 private:
-    Pattern table[50];          // Tableau des schèmes
-    bool occupied[50];          // Indicateurs d'occupation
-    int size;                   // Nombre d'éléments actuels
-    static const int CAPACITY = 50;
-    
-    /**
-     * Fonction de hachage locale
-     * Complexité : O(k)
-     */
-    unsigned int hashFunction(const std::string& key) {
-        return ArabicHashFunction::hash(key) % CAPACITY;
+    struct PatternNode {
+        Pattern pattern;
+        PatternNode* next;
+        explicit PatternNode(const Pattern& p) : pattern(p), next(nullptr) {}
+    };
+
+    std::vector<PatternNode*> buckets;
+    int size;
+    static const int DEFAULT_CAPACITY = 50;
+    static constexpr double MAX_LOAD_FACTOR = 0.75;
+    // Index = hash % capacité
+    unsigned int hashFunction(const std::string& key, int capacity) const {
+        return ArabicHashFunction::hash(key) % capacity;
+    }
+
+    // Libère toutes les listes
+    void clearBuckets() {
+        for (auto* head : buckets) {
+            PatternNode* current = head;
+            while (current != nullptr) {
+                PatternNode* next = current->next;
+                delete current;
+                current = next;
+            }
+        }
+        buckets.clear();
+    }
+
+    // Redimensionne et réinsère tous les schèmes
+    void rehash(int newCapacity) {
+        std::vector<PatternNode*> newBuckets(static_cast<size_t>(newCapacity), nullptr);
+
+        for (auto* head : buckets) {
+            PatternNode* current = head;
+            while (current != nullptr) {
+                PatternNode* next = current->next;
+                unsigned int index = hashFunction(current->pattern.name, newCapacity);
+
+                current->next = newBuckets[index];
+                newBuckets[index] = current;
+
+                current = next;
+            }
+        }
+
+        buckets = std::move(newBuckets);
     }
     
 public:
-    // ========================================================================
-    // CONSTRUCTEUR
-    // ========================================================================
-    
-    PatternHashTable() : size(0) {
-        for (int i = 0; i < CAPACITY; i++) {
-            occupied[i] = false;
-        }
+    PatternHashTable() : buckets(DEFAULT_CAPACITY, nullptr), size(0) {}
+
+    ~PatternHashTable() {
+        clearBuckets();
     }
     
-    // ========================================================================
-    // OPÉRATIONS PUBLIQUES
-    // ========================================================================
-    
-    /**
-     * Insère un schème morphologique dans la table
-     * Utilise le sondage linéaire pour gérer les collisions
-     * Complexité : O(1) en moyenne, O(n) pire cas
-     */
+    // Insertion avec chaînage + rehash si facteur de charge dépasse le seuil
     bool insert(const Pattern& pattern) {
-        if (size >= CAPACITY) {
-            std::cerr << "Erreur: Table pleine! Impossible d'insérer." << std::endl;
-            return false;
+        if (buckets.empty()) {
+            buckets.assign(DEFAULT_CAPACITY, nullptr);
         }
-        
-        unsigned int index = hashFunction(pattern.name);
-        
-        // Sondage linéaire : chercher la première position libre
-        int collisions = 0;
-        while (occupied[index] && collisions < CAPACITY) {
-            // Vérifier si la clé existe déjà
-            if (table[index].name == pattern.name) {
+
+        unsigned int index = hashFunction(pattern.name, static_cast<int>(buckets.size()));
+        PatternNode* current = buckets[index];
+        while (current != nullptr) {
+            if (current->pattern.name == pattern.name) {
                 std::cout << "Schème '" << pattern.name << "' existe déjà. Mise à jour." << std::endl;
-                table[index] = pattern;
+                current->pattern = pattern;
                 return true;
             }
-            
-            index = (index + 1) % CAPACITY;
-            collisions++;
+            current = current->next;
         }
-        
-        if (collisions >= CAPACITY) {
-            std::cerr << "Erreur: Table pleine après sondage linéaire." << std::endl;
-            return false;
-        }
-        
-        // Insérer le schème
-        table[index] = pattern;
-        occupied[index] = true;
+
+        PatternNode* node = new PatternNode(pattern);
+        node->next = buckets[index];
+        buckets[index] = node;
         size++;
-        
+
+        if (getLoadFactor() > MAX_LOAD_FACTOR) {
+            rehash(static_cast<int>(buckets.size()) * 2);
+        }
+
         return true;
     }
     
-    /**
-     * Recherche un schème par son nom
-     * Utilise le sondage linéaire
-     * Complexité : O(1) en moyenne, O(n) pire cas
-     */
+    // Recherche dans la liste de la case
     Pattern* search(const std::string& patternName) {
-        unsigned int index = hashFunction(patternName);
-        int probes = 0;
-        
-        // Sondage linéaire
-        while (occupied[index] && probes < CAPACITY) {
-            if (table[index].name == patternName) {
-                return &table[index];
+        if (buckets.empty()) return nullptr;
+        unsigned int index = hashFunction(patternName, static_cast<int>(buckets.size()));
+        PatternNode* current = buckets[index];
+        while (current != nullptr) {
+            if (current->pattern.name == patternName) {
+                return &current->pattern;
             }
-            
-            index = (index + 1) % CAPACITY;
-            probes++;
+            current = current->next;
         }
-        
-        return nullptr;  // Non trouvé
+        return nullptr;
     }
     
-    /**
-     * Vérifie si un schème existe
-     * Complexité : O(1) en moyenne
-     */
     bool contains(const std::string& patternName) {
         return search(patternName) != nullptr;
     }
-    
-    /**
-     * Supprime un schème par son nom
-     * Complexité : O(1) en moyenne
-     */
+    // Suppression dans la liste de la case
     bool remove(const std::string& patternName) {
-        unsigned int index = hashFunction(patternName);
-        int probes = 0;
-        
-        // Trouver le schème
-        while (occupied[index] && probes < CAPACITY) {
-            if (table[index].name == patternName) {
-                occupied[index] = false;
+        if (buckets.empty()) return false;
+        unsigned int index = hashFunction(patternName, static_cast<int>(buckets.size()));
+        PatternNode* current = buckets[index];
+        PatternNode* prev = nullptr;
+
+        while (current != nullptr) {
+            if (current->pattern.name == patternName) {
+                if (prev == nullptr) {
+                    buckets[index] = current->next;
+                } else {
+                    prev->next = current->next;
+                }
+                delete current;
                 size--;
-                
-                // Réinsérer les éléments suivants pour mantenir l'intégrité
-                reorganizeAfterDeletion(index);
                 return true;
             }
-            
-            index = (index + 1) % CAPACITY;
-            probes++;
+            prev = current;
+            current = current->next;
         }
-        
-        return false;  // Non trouvé
+
+        return false;
     }
     
-    /**
-     * Réorganise la table après suppression
-     * Pour maintenir la cohérence du sondage linéaire
-     * Complexité : O(n) dans le pire cas
-     */
-    void reorganizeAfterDeletion(int deletedIndex) {
-        int index = (deletedIndex + 1) % CAPACITY;
-        
-        while (occupied[index]) {
-            Pattern temp = table[index];
-            occupied[index] = false;
-            size--;
-            
-            // Réinsérer l'élément
-            insert(temp);
-            
-            index = (index + 1) % CAPACITY;
-        }
-    }
-    
-    /**
-     * Retourne le nombre de schèmes dans la table
-     */
+    // Nombre de schèmes
     int getSize() const {
         return size;
     }
-    
-    /**
-     * Retourne la capacité maximale
-     */
+    // Capacité actuelle
     int getCapacity() const {
-        return CAPACITY;
+        return static_cast<int>(buckets.size());
     }
-    
-    /**
-     * Retourne le facteur de charge
-     */
+    // Facteur de charge = size / capacité
     double getLoadFactor() const {
-        return static_cast<double>(size) / CAPACITY;
+        if (buckets.empty()) return 0.0;
+        return static_cast<double>(size) / static_cast<double>(buckets.size());
     }
-    
-    /**
-     * Affiche tous les schèmes de la table
-     * Complexité : O(n)
-     */
     void displayAll() {
         if (size == 0) {
             std::cout << "Aucun schème dans la table." << std::endl;
@@ -220,47 +165,40 @@ public:
         }
         
         std::cout << "\n=== Schèmes Morphologiques Stockés ===" << std::endl;
-        std::cout << "Total: " << size << " schèmes (Capacité: " << CAPACITY << ")" << std::endl;
+        std::cout << "Total: " << size << " schèmes (Capacité: " << getCapacity() << ")" << std::endl;
         std::cout << "Facteur de charge: " << (getLoadFactor() * 100) << "%" << std::endl;
         std::cout << std::string(70, '-') << std::endl;
         
         int count = 0;
-        for (int i = 0; i < CAPACITY; i++) {
-            if (occupied[i]) {
+        for (size_t i = 0; i < buckets.size(); i++) {
+            PatternNode* current = buckets[i];
+            while (current != nullptr) {
                 count++;
-                std::cout << count << ". Nom: " << table[i].name 
-                         << " | Structure: " << table[i].structure
-                         << " | Description: " << table[i].description << std::endl;
+                std::cout << count << ". Nom: " << current->pattern.name
+                          << " | Structure: " << current->pattern.structure
+                          << " | Description: " << current->pattern.description << std::endl;
+                current = current->next;
             }
         }
         std::cout << std::string(70, '-') << std::endl;
     }
     
-    /**
-     * Retourne un pointeur vers un schème par index
-     * (Utile pour les itérations)
-     */
-    Pattern* getPatternAt(int index) {
-        if (index >= 0 && index < CAPACITY && occupied[index]) {
-            return &table[index];
-        }
-        return nullptr;
-    }
-    
-    /**
-     * Retourne tous les schèmes dans un tableau
-     * Complexité : O(n)
-     */
     Pattern* getAllPatterns(int& count) {
-        count = 0;
+        count = size;
+        if (size == 0) {
+            return new Pattern[0];
+        }
+
         Pattern* patterns = new Pattern[size];
-        
-        for (int i = 0; i < CAPACITY; i++) {
-            if (occupied[i]) {
-                patterns[count++] = table[i];
+        int idx = 0;
+        for (size_t i = 0; i < buckets.size(); i++) {
+            PatternNode* current = buckets[i];
+            while (current != nullptr) {
+                patterns[idx++] = current->pattern;
+                current = current->next;
             }
         }
-        
+
         return patterns;
     }
 };

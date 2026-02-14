@@ -40,13 +40,15 @@ MorphologyGUI::MorphologyGUI(QWidget *parent) : QMainWindow(parent) {
         globalEngine->addPattern(p5);
         globalEngine->addPattern(p6);
         
-        // Charger les racines
+        // Charger les racines (Collecte → Encodage → Tri → Insertion médiane)
         std::vector<std::string> roots = Utils::loadRootsFromFile("data/roots.txt");
+        std::vector<std::string> validRoots;
         for (const auto& r : roots) {
             if (Utils::isValidArabicRoot(r)) {
-                globalEngine->addRoot(r);
+                validRoots.push_back(r);
             }
         }
+        globalEngine->loadRootsBalanced(validRoots);
     }
     
     setupUI();
@@ -1521,7 +1523,7 @@ void MorphologyGUI::onAnalyzeDefectiveVerb() {
             "border-radius: 5px; color: white;"
         );
         
-    } else if (weakPos == 2 || weakPos == chars.size() - 1) {
+    } else if (weakPos == 2 || weakPos == static_cast<int>(chars.size()) - 1) {
         // فعل ناقص - Lettre faible à la fin (3ème radicale)
         verbType = "Verbe Défectif (Naqis)";
         arabicType = "فعل ناقص";

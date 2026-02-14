@@ -6,24 +6,8 @@
 #include <fstream>
 #include <vector>
 
-/**
- * ============================================================================
- * FONCTIONS UTILITAIRES
- * Moteur de Recherche Morphologique Arabe
- * ============================================================================
- */
-
 namespace Utils {
-    
-    // ========================================================================
-    // GESTION DES FICHIERS
-    // ========================================================================
-    
-    /**
-     * Charge les racines arabes à partir d'un fichier
-     * Format du fichier: une racine par ligne
-     * Complexité : O(n * k) où n = nombre de racines, k = longueur moyenne
-     */
+    // Charge les racines depuis un fichier (une par ligne)
     inline std::vector<std::string> loadRootsFromFile(const std::string& filename) {
         std::vector<std::string> roots;
         std::ifstream file(filename);
@@ -35,9 +19,7 @@ namespace Utils {
         
         std::string root;
         while (std::getline(file, root)) {
-            // Ignorer les lignes vides et les commentaires
             if (!root.empty() && root[0] != '#') {
-                // Supprimer les espaces inutiles
                 root.erase(0, root.find_first_not_of(" \t\r\n"));
                 root.erase(root.find_last_not_of(" \t\r\n") + 1);
                 
@@ -50,11 +32,7 @@ namespace Utils {
         file.close();
         return roots;
     }
-    
-    /**
-     * Sauvegarde les racines dans un fichier
-     * Complexité : O(n)
-     */
+    // Sauvegarde les racines dans un fichier
     inline bool saveRootsToFile(const std::string& filename, const std::vector<std::string>& roots) {
         std::ofstream file(filename);
         
@@ -74,34 +52,18 @@ namespace Utils {
         file.close();
         return true;
     }
-    
-    // ========================================================================
-    // AFFICHAGE ET FORMATAGE
-    // ========================================================================
-    
-    /**
-     * Affiche une ligne de séparation
-     */
     inline void printSeparator(int width = 70, char ch = '=') {
         for (int i = 0; i < width; i++) {
             std::cout << ch;
         }
         std::cout << std::endl;
     }
-    
-    /**
-     * Affiche le titre du programme
-     */
     inline void printHeader() {
         printSeparator(70, '=');
         std::cout << "   MOTEUR DE RECHERCHE MORPHOLOGIQUE ARABE" << std::endl;
         std::cout << "   ABR + Table de Hachage + Listes Chaînées" << std::endl;
         printSeparator(70, '=');
     }
-    
-    /**
-     * Affiche un menu principal
-     */
     inline void printMainMenu() {
         std::cout << "\n╔════════════════════════════════════════════════════════════════╗\n";
         std::cout << "║           MENU PRINCIPAL                                         ║\n";
@@ -136,10 +98,6 @@ namespace Utils {
         std::cout << "0. ▶ Quitter" << std::endl;
         std::cout << "\n";
     }
-    
-    /**
-     * Affiche les statistiques du système
-     */
     inline void printStatistics(int rootCount, int patternCount, double loadFactor) {
         printSeparator(70, '-');
         std::cout << "STATISTIQUES DU SYSTÈME" << std::endl;
@@ -151,15 +109,7 @@ namespace Utils {
         
         printSeparator(70, '-');
     }
-    
-    // ========================================================================
-    // CONVERSION ET VÉRIFICATION DE CHAÎNES
-    // ========================================================================
-
-    /**
-     * Découpe une chaîne UTF-8 en unités (codepoints) sous forme de strings.
-     * Complexité : O(n) où n = nombre d'octets
-     */
+    // Découpe une chaîne UTF-8 en caractères (codepoints)
     inline std::vector<std::string> utf8Split(const std::string& str) {
         std::vector<std::string> result;
         size_t i = 0;
@@ -176,7 +126,7 @@ namespace Utils {
             } else if ((c & 0xF8) == 0xF0) {
                 len = 4;
             } else {
-                len = 1; // octet invalide, traiter comme un caractère
+                len = 1;
             }
 
             if (i + len > str.size()) {
@@ -188,33 +138,64 @@ namespace Utils {
         }
         return result;
     }
-
-    /**
-     * Retourne la longueur UTF-8 (nombre de caractères)
-     * Complexité : O(n)
-     */
+    // Longueur en caractères UTF-8
     inline size_t utf8Length(const std::string& str) {
         return utf8Split(str).size();
     }
-    
-    /**
-     * Demande et récupère une entrée utilisateur
-     */
+    // Index alphabétique arabe (1..29), 0 si inconnu
+    inline int arabicCharIndex(const std::string& ch) {
+        if (ch == "\xd8\xa7" || ch == "\xd8\xa3" || ch == "\xd8\xa5" || ch == "\xd8\xa2") return 1;
+        if (ch == "\xd8\xa8") return 2;
+        if (ch == "\xd8\xaa" || ch == "\xd8\xa9") return 3;
+        if (ch == "\xd8\xab") return 4;
+        if (ch == "\xd8\xac") return 5;
+        if (ch == "\xd8\xad") return 6;
+        if (ch == "\xd8\xae") return 7;
+        if (ch == "\xd8\xaf") return 8;
+        if (ch == "\xd8\xb0") return 9;
+        if (ch == "\xd8\xb1") return 10;
+        if (ch == "\xd8\xb2") return 11;
+        if (ch == "\xd8\xb3") return 12;
+        if (ch == "\xd8\xb4") return 13;
+        if (ch == "\xd8\xb5") return 14;
+        if (ch == "\xd8\xb6") return 15;
+        if (ch == "\xd8\xb7") return 16;
+        if (ch == "\xd8\xb8") return 17;
+        if (ch == "\xd8\xb9") return 18;
+        if (ch == "\xd8\xba") return 19;
+        if (ch == "\xd9\x81") return 20;
+        if (ch == "\xd9\x82") return 21;
+        if (ch == "\xd9\x83") return 22;
+        if (ch == "\xd9\x84") return 23;
+        if (ch == "\xd9\x85") return 24;
+        if (ch == "\xd9\x86") return 25;
+        if (ch == "\xd9\x87") return 26;
+        if (ch == "\xd9\x88") return 27;
+        if (ch == "\xd9\x8a" || ch == "\xd9\x89") return 28;
+        if (ch == "\xd8\xa1") return 29;
+        return 0;
+    }
+    // Clé numérique d’une racine trilittérale
+    inline int computeRootKey(const std::string& root) {
+        std::vector<std::string> letters = utf8Split(root);
+        if (letters.size() != 3) return -1;
+        int c1 = arabicCharIndex(letters[0]);
+        int c2 = arabicCharIndex(letters[1]);
+        int c3 = arabicCharIndex(letters[2]);
+        if (c1 == 0 || c2 == 0 || c3 == 0) return -1;
+        return c1 * 900 + c2 * 30 + c3;
+    }
+    // Lecture d’entrée utilisateur (ligne)
     inline std::string getInput(const std::string& prompt) {
         std::string input;
         std::cout << prompt;
         std::getline(std::cin, input);
-        
-        // Supprimer les espaces inutiles
         input.erase(0, input.find_first_not_of(" \t"));
         input.erase(input.find_last_not_of(" \t") + 1);
         
         return input;
     }
-    
-    /**
-     * Demande un choix numérique
-     */
+    // Lecture d’un choix numérique
     inline int getChoice(int minOption, int maxOption) {
         int choice = -1;
         std::string input;
@@ -235,23 +216,11 @@ namespace Utils {
             }
         }
     }
-    
-    /**
-     * Vérifie si une chaîne est une racine trilitérale valide
-     * (Très simplifiée - vérification de longueur basique)
-     */
+    // Vérifie si la racine est trilittérale
     inline bool isValidArabicRoot(const std::string& root) {
-        // Vérification basique : racine trilitérale (3 caractères UTF-8)
         return utf8Length(root) == 3;
     }
-    
-    // ========================================================================
-    // AFFICHAGE FORMATÉ POUR RÉSULTATS
-    // ========================================================================
-    
-    /**
-     * Affiche un résultat de validation
-     */
+    // Affiche un résultat de validation
     inline void printValidationResult(const std::string& word, const std::string& root, bool isValid, const std::string& pattern) {
         std::cout << "\n";
         printSeparator(70, '-');
@@ -272,10 +241,7 @@ namespace Utils {
         
         printSeparator(70, '-');
     }
-    
-    /**
-     * Affiche un résultat de génération
-     */
+    // Affiche un résultat de génération
     inline void printGenerationResult(const std::string& root, const std::string& pattern, const std::string& derived) {
         std::cout << "\n";
         printSeparator(70, '-');
@@ -288,22 +254,12 @@ namespace Utils {
         
         printSeparator(70, '-');
     }
-    
-    // ========================================================================
-    // UTILITAIRES DE FICHIER
-    // ========================================================================
-    
-    /**
-     * Vérifie si un fichier existe
-     */
+    // Vérifie si un fichier existe
     inline bool fileExists(const std::string& filename) {
         std::ifstream file(filename);
         return file.good();
     }
-    
-    /**
-     * Affiche un message d'attente
-     */
+    // Pause (attendre Entrée)
     inline void waitForKeypress() {
         std::cout << "\nAppuyez sur Entrée pour continuer...";
         std::string dummy;
